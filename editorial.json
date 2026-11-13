@@ -1,0 +1,6 @@
+{
+  "_readme": "Edit by pull request so every change is reviewed. featured: up to 5 item ids shown first. hidden: item ids removed from the site. corrections: [{\"id\": \"item id\", \"date\": \"YYYY-MM-DD\", \"note\": \"what changed\"}]. Item ids appear in data/items.json.",
+  "featured": [],
+  "hidden": [],
+  "corrections": []
+}
