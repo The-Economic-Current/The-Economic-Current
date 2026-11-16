@@ -3,7 +3,7 @@
 Global finance. Clear perspective.
 
 First working version: **verified source → scheduled collection → stored news → website**.
-Python 3.10+ standard library only. There is nothing to install.
+Python 3.12 standard library only. There is nothing to install.
 
 ## Architecture
 
@@ -92,3 +92,31 @@ Not built yet:
 - No credentials are used. If you add an API later, keep the key in GitHub Actions secrets, never in the repo.
 - Feed text is HTML-escaped when rendered. The parser is Python's built-in XML parser; for hostile feeds
   consider swapping in `defusedxml`.
+
+
+## Day-to-day tasks (developer notes, kept off the public site)
+
+**Turn a source on.** Run the *Verify sources* workflow (Actions tab) to test every feed from GitHub's network.
+Read the publisher's terms (`terms_url`), then in `sources.json` set `enabled: true` and `terms_reviewed` to
+today's date (YYYY-MM-DD). Never enable a source whose `reuse` is `blocked`. Set the repository variable
+`ECC_CONTACT` (an email) because some regulators require a contact in the User-Agent. Then run *Collect and publish*.
+
+**Calendar and IPOs.** Edit `events.json`. Every entry needs an https `source_url`, a `status`
+(proposed, expected, confirmed, postponed, withdrawn, completed) and a `verified` date. Use `date: null` for TBC.
+IPOs take `milestones` (filing, subscription_open, subscription_close, pricing, listing), each with its own date and status.
+Check each milestone against the exchange or regulator filing before marking it `confirmed`.
+
+**Newsletter editions.** Write a JSON file in `editions/drafts/{daily,weekly,monthly}/YYYY-MM-DD.json`. After review, move it to
+`editions/published/...` and fill in `reviewed_by` and `reviewed_on`; editions without both are not published.
+Each edition gets its own URL, for example `/brief/2026-11-16/`. Fields: `date`, `title`, `period_start`, `period_end`,
+`intro`, `stories` (`headline`, `context`, `why`, `sources`), `themes`, `watchlist`, `connections`.
+
+**Lead story note.** `editorial.json` -> `lead_note` {id, why, sources} adds a "Why it matters" note to the lead story, written by an editor from the cited reporting. It is shown only if the id matches the current lead.
+
+**Newsletter signup.** Set `newsletter.enabled` to `true` and `newsletter.signup_url` to a working https form endpoint
+(for example a Buttondown, Mailchimp or MailerLite form URL) in `config.json`. Until then the Subscribe button stays disabled.
+
+**Tests.** `python -m unittest discover tests`
+
+**Refresh schedule.** `.github/workflows/refresh.yml` runs at minute 17 of every second hour (UTC). If sources fail, the
+last good stories stay and the header shows "updates delayed" after `stale_after_hours`.

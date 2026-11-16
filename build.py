@@ -4,15 +4,21 @@ import html
 import json
 import re
 import shutil
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from collect import CATEGORIES, REGIONS, load_json, now_utc, parse_iso, save_json
 
 esc = html.escape
 
-NAV = [("Latest", ""), ("Daily Brief", "brief/"), ("Weekly Review", "weekly/"),
-       ("Monthly Outlook", "monthly/"), ("Archive", "archive/"), ("About", "about/")]
+NAV = [("Latest News", ""), ("Daily Brief", "brief/"), ("Weekly Review", "weekly/"),
+       ("Monthly Outlook", "monthly/"), ("Calendar", "calendar/"), ("Archive", "archive/"), ("About", "about/")]
+CTX = {"refresh": "", "subscribe": ""}
+STATUSES = ("proposed", "expected", "confirmed", "postponed", "withdrawn", "completed")
+EVENT_TYPES = {"ipo": "IPO", "earnings": "Earnings", "inflation": "Inflation", "employment": "Employment",
+               "gdp": "GDP", "central_bank": "Central bank", "election": "Election", "policy": "Policy deadline", "other": "Other"}
+MILESTONES = [("filing", "Filing"), ("subscription_open", "Subscription opens"), ("subscription_close", "Subscription closes"),
+              ("pricing", "Pricing"), ("listing", "Listing")]
 
 STOP = set("the and for with from that this after over amid says say new its are was were has have will into as at by of to in on a an or is it".split())
 
@@ -40,7 +46,7 @@ def layout(cfg, title, body, depth, active, page_js=""):
 <link rel="stylesheet" href="{p}assets/style.css">
 </head>
 <body>
-<a class="skip" href="#main">Skip to stories</a>
+<a class="skip" href="#main">Skip to content</a>
 <header class="masthead">
   <div class="wrap">
     <a class="brand" href="{p or './'}">
@@ -48,6 +54,8 @@ def layout(cfg, title, body, depth, active, page_js=""):
       <svg class="wave" viewBox="0 0 120 10" aria-hidden="true" focusable="false"><path d="M0 5 C10 0 20 0 30 5 S50 10 60 5 S80 0 90 5 S110 10 120 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
     </a>
     <p class="tagline">{esc(cfg['tagline'])}</p>
+    <div class="dateline"><span id="today">{now_utc().strftime('%A %d %b %Y')} (UTC)</span>{CTX['refresh']}</div>
+    {CTX['subscribe']}
     <nav aria-label="Sections">{nav}</nav>
   </div>
 </header>
@@ -126,10 +134,12 @@ def status_block(enabled, last, stale, cfg):
     return f'<p class="status" role="status">{txt}</p>'
 
 
-def story_html(it, others, corrections):
+def story_html(it, others, corrections, pri=0, lead=False):
     ts = it.get("published")
     when = (f'<time class="t" datetime="{ts}">{esc(fmt_utc(ts))}</time>'
             if ts else '<span class="nodate">Date not provided</span>')
+    upd = (f'<p class="upd">Updated <time class="t" datetime="{it["updated"]}">{esc(fmt_utc(it["updated"]))}</time></p>'
+           if it.get("updated") else "")
     if it.get("summary"):
         summ = f'<p class="sum"><span class="basis">Publisher excerpt</span> {esc(it["summary"])}</p>'
     else:
@@ -141,8 +151,8 @@ def story_html(it, others, corrections):
         also = (f'<p class="also">Also reported by {links}. Repeated coverage of one report is not independent confirmation.</p>')
     corr = "".join(f'<p class="corr"><strong>Correction, {esc(c["date"])}:</strong> {esc(c["note"])}</p>'
                    for c in corrections if c.get("id") == it["id"])
-    return f"""<article class="story" data-cat="{esc(it['category'])}" data-region="{esc(it['region'])}" data-ts="{esc(ts or '')}">
-  <div class="when">{when}</div>
+    return f"""<article class="story{' lead' if lead else ''}" data-cat="{esc(it['category'])}" data-region="{esc(it['region'])}" data-ts="{esc(ts or '')}" data-pri="{pri}" data-text="{esc((it['title'] + ' ' + it['publisher'] + ' ' + (it.get('summary') or '')).lower())}">
+  <div class="when">{when}{upd}</div>
   <div class="what">
     <h3><a href="{esc(it['url'])}" rel="noopener noreferrer" target="_blank">{esc(it['title'])}</a></h3>
     <p class="meta"><span class="pub">{esc(it['publisher'])}</span><span>{esc(it['category'])}</span><span>{esc(it['region'])}</span></p>
@@ -153,55 +163,216 @@ def story_html(it, others, corrections):
 
 # ---------- pages ----------
 
-def home(cfg, items, editorial, status_html):
+def priority(group, registry_kind):
+    """Editorial-priority score: more independent publishers and official sources rank higher. Recency breaks ties."""
+    pubs = {i["publisher"] for i in group}
+    official = any(registry_kind.get(i.get("source_id")) == "official" for i in group)
+    return len(pubs) * 10 + (5 if official else 0)
+
+
+def build_rows(items, editorial, registry):
     hidden = set(editorial.get("hidden", []))
     visible = [i for i in items.values() if i["id"] not in hidden]
-    groups = cluster(visible)
+    kind = {s["id"]: s.get("kind", "press") for s in registry}
     rows = []
-    for g in groups:
-        g.sort(key=lambda i: i.get("published") or i["first_seen"])
-        rows.append((g[0], g[1:]))
-    rows.sort(key=lambda r: r[0].get("published") or r[0]["first_seen"], reverse=True)
-    rows = rows[:cfg.get("homepage_items", 150)]
+    for g in cluster(visible):
+        g.sort(key=lambda i: i.get("published") or "9999")
+        rows.append({"lead": g[0], "others": g[1:], "pri": priority(g, kind)})
+    # newest first; undated stories go last because collection time is not publication time
+    rows.sort(key=lambda r: r["lead"].get("published") or "", reverse=True)
+    return rows
+
+
+def parse_day(s):
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def clean_events(events):
+    """Keep only events that have a source link and a valid status. Unknown dates become TBC, never guessed."""
+    good = []
+    for e in events:
+        if not e.get("title") or not str(e.get("source_url", "")).startswith("https://"):
+            continue
+        if e.get("status") not in STATUSES:
+            continue
+        e = dict(e)
+        e["_day"] = parse_day(e.get("date"))
+        good.append(e)
+    return good
+
+
+def date_label(day, raw, time_utc=None):
+    if not day:
+        return "TBC"
+    return day.strftime("%d %b %Y") + (f", {esc(time_utc)} UTC" if time_utc else "")
+
+
+def event_html(e):
+    t = EVENT_TYPES.get(e.get("type"), "Other")
+    head = f'<h3>{esc(e["title"])}</h3>'
+    st = f'<span class="badge {e["status"]}">{e["status"].capitalize()}</span>'
+    meta = " ".join(f"<span>{esc(str(e[k]))}</span>" for k in ("country", "exchange", "ticker", "currency") if e.get(k))
+    ms = ""
+    if e.get("type") == "ipo":
+        rows = ""
+        for key, label in MILESTONES:
+            m = (e.get("milestones") or {}).get(key) or {}
+            d = parse_day(m.get("date"))
+            mst = m.get("status") if m.get("status") in STATUSES else None
+            rows += (f'<tr><th scope="row">{label}</th><td>{date_label(d, m.get("date"), m.get("time_utc"))}</td>'
+                     f'<td>{f"<span class=\'badge {mst}\'>{mst.capitalize()}</span>" if mst and d else "TBC"}</td></tr>')
+        price = e.get("final_price") or e.get("offer_range")
+        pl = ("Final price" if e.get("final_price") else "Offer range") if price else ""
+        ms = (f'<table class="ms"><tbody>{rows}</tbody></table>'
+              + (f'<p class="meta"><span>{pl}: {esc(str(price))}</span></p>' if price else ""))
+    ver = f' Checked {esc(e["verified"])}.' if e.get("verified") else ""
+    return (f'<article class="event" data-type="{esc(e.get("type", "other"))}"><div class="when">{date_label(e["_day"], e.get("date"), e.get("time_utc"))}</div>'
+            f'<div class="what">{head}<p class="meta"><span class="pub">{t}</span>{st}{meta}</p>{ms}'
+            f'<p class="also">Source: <a href="{esc(e["source_url"])}" rel="noopener noreferrer" target="_blank">{esc(e.get("source_name") or "Original announcement")}</a>.{ver}</p></div></article>')
+
+
+def sidebar(cfg, events, editorial, today):
+    up = sorted((e for e in events if e["status"] not in ("withdrawn", "completed") and (e["_day"] is None or e["_day"] >= today)),
+                key=lambda e: (e["_day"] is None, e["_day"] or today))[:6]
+    ev = ("".join(f'<li><span class="d">{date_label(e["_day"], None)}</span> <a href="{esc(e["source_url"])}" rel="noopener noreferrer" target="_blank">{esc(e["title"])}</a>'
+                  f' <span class="badge {e["status"]}">{e["status"].capitalize()}</span></li>' for e in up)
+          if up else "<li>No upcoming events have been added yet.</li>")
+    th = "".join(f'<li><strong>{esc(t["title"])}</strong> {esc(t.get("note", ""))}</li>' for t in editorial.get("themes", []))
+    th = th or "<li>Themes appear here when the editors publish them.</li>"
+    return f"""<aside class="side" aria-label="Sidebar">
+<section><h2 class="sect">Newsletter</h2><p class="small">Daily Brief, Weekly Review and Monthly Outlook, each with dated source links.</p>{CTX['subscribe']}</section>
+<section><h2 class="sect">Coming up</h2><ul class="plain">{ev}</ul><p class="small"><a href="calendar/">Full calendar</a></p></section>
+<section><h2 class="sect">Themes to watch</h2><ul class="plain">{th}</ul></section>
+</aside>"""
+
+
+def home(cfg, rows, editorial, status_html, events, today):
     corrections = editorial.get("corrections", [])
-    by_id = {r[0]["id"]: r for r in rows}
-
-    featured = [by_id[i] for i in editorial.get("featured", []) if i in by_id][:5]
-    feat_html = ""
-    if featured:
-        feat_html = ('<section class="featured" aria-label="Selected by the editors"><h2 class="sect">Selected by the editors</h2>'
-                     + "".join(story_html(i, o, corrections) for i, o in featured) + "</section>")
-
+    by_id = {r["lead"]["id"]: r for r in rows}
+    ordered = [by_id[i] for i in editorial.get("featured", []) if i in by_id]
+    rest = sorted((r for r in rows if r not in ordered), key=lambda r: (r["pri"], r["lead"].get("published") or ""), reverse=True)
+    top = (ordered + rest)[:5]
+    top_html = ""
+    if top:
+        note = editorial.get("lead_note") or {}
+        why = ""
+        if note.get("id") == top[0]["lead"]["id"] and note.get("why"):
+            srcs = ", ".join(f'<a href="{esc(u["url"])}" rel="noopener noreferrer" target="_blank">{esc(u["publisher"])}</a>' for u in note.get("sources", []))
+            why = f'<div class="why"><h3>Why it matters</h3><p>{esc(note["why"])}</p>' + (f'<p class="small">Sources: {srcs}</p>' if srcs else "") + "</div>"
+        top_html = ('<section class="top" aria-label="Top stories"><h2 class="sect">Top stories</h2>'
+                    + story_html(top[0]["lead"], top[0]["others"], corrections, top[0]["pri"], True) + why
+                    + "".join(story_html(r["lead"], r["others"], corrections, r["pri"]) for r in top[1:]) + "</section>")
     chips = '<button type="button" class="chip" data-cat="" aria-pressed="true">All topics</button>' + "".join(
         f'<button type="button" class="chip" data-cat="{esc(c)}" aria-pressed="false">{esc(c)}</button>' for c in CATEGORIES)
-    region_opts = '<option value="">All regions</option>' + "".join(f'<option>{esc(r)}</option>' for r in REGIONS)
-
+    opts = lambda vals, first: f'<option value="">{first}</option>' + "".join(f"<option>{esc(v)}</option>" for v in vals)
     if rows:
-        feed = "".join(story_html(i, o, corrections) for i, o in rows)
-        feed_html = f'<div class="feed" id="feed">{feed}</div><p id="none" class="empty" hidden>No stories match these filters.</p>'
+        feed = "".join(story_html(r["lead"], r["others"], corrections, r["pri"]) for r in rows[:cfg.get("homepage_items", 150)])
+        feed_html = (f'<p id="loading" class="empty">Loading stories…</p><div class="feed" id="feed">{feed}</div>'
+                     '<p id="none" class="empty" hidden>No stories match these filters. Clear a filter or search term to see more.</p>'
+                     '<p class="more"><button type="button" id="more" class="btn" hidden>Load more</button></p>'
+                     '<noscript><p class="status warn">JavaScript is off, so filters are unavailable. All stories are listed in date order above.</p></noscript>')
     else:
-        feed_html = ('<div class="empty"><p>No stories collected yet.</p>'
-                     '<p>Review a source in <code>sources.json</code>, set <code>terms_reviewed</code> and <code>enabled</code>, '
-                     'then run <code>python run.py</code>.</p></div>')
-
+        feed_html = '<div class="empty"><p>No verified stories are available right now.</p><p>Stories appear here after their sources have been reviewed and collected. Nothing on this site is placeholder or simulated.</p></div>'
     body = f"""{status_html}
-<section class="controls" aria-label="Filters">
+{top_html}
+<div class="cols"><div class="mainc">
+<h2 class="sect" id="latest">Latest worldwide news</h2>
+<section class="controls" aria-label="Search and filters">
+  <label class="q">Search <input type="search" id="q" autocomplete="off" placeholder="Headline, publisher or topic"></label>
   <div class="chips" id="chips">{chips}</div>
-  <label class="region">Region <select id="region">{region_opts}</select></label>
+  <label>Region <select id="region">{opts(REGIONS, "All regions")}</select></label>
+  <label>Published <select id="when"><option value="">Any time</option><option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
+  <label>Sort <select id="sort"><option value="new">Newest first</option><option value="pri">Editorial priority</option></select></label>
 </section>
 <p class="tz" id="tz"></p>
-{feat_html}
-{feed_html}"""
-    return layout(cfg, f"{cfg['site_name']}: {cfg['tagline']}", body, 0, "Latest")
+<p id="count" class="tz" role="status"></p>
+{feed_html}
+</div>{sidebar(cfg, events, editorial, today)}</div>"""
+    return layout(cfg, f"{cfg['site_name']}: {cfg['tagline']}", body, 0, "Latest News")
 
 
-def edition_page(cfg, name, path, depth, what, rng):
-    body = f"""<h1>{esc(name)}</h1>
-<p class="lede">{what}</p>
-<p>{rng}</p>
-<div class="empty"><p>No edition has been published yet.</p>
-<p>Editions start as drafts in <code>editions/drafts/</code> and appear here only after an editor moves them to <code>editions/published/</code>. Every edition states its exact date range in UTC.</p></div>"""
-    return layout(cfg, f"{name} | {cfg['site_name']}", body, depth, name)
+def calendar_page(cfg, events, today):
+    ev = sorted(events, key=lambda e: (e["_day"] is None, e["_day"] or today))
+    upcoming = [e for e in ev if e["status"] not in ("completed", "withdrawn") and (e["_day"] is None or e["_day"] >= today)]
+    past = [e for e in ev if e not in upcoming]
+    chips = '<button type="button" class="chip" data-type="" aria-pressed="true">All events</button>' + "".join(
+        f'<button type="button" class="chip" data-type="{k}" aria-pressed="false">{v}</button>' for k, v in EVENT_TYPES.items())
+    sec = lambda title, lst: (f'<h2 class="sect">{title}</h2>' + "".join(event_html(e) for e in lst)) if lst else ""
+    body = f"""<h1>Calendar</h1>
+<p class="lede">IPO milestones, earnings, data releases, central-bank decisions, elections and policy deadlines. Dates are UTC. TBC means no date has been announced. Expected and proposed dates are not confirmed.</p>
+<div class="chips" id="evchips">{chips}</div>
+<div id="evlist">{sec("Upcoming", upcoming)}{sec("Recent and past", past)}</div>
+{'' if ev else '<div class="empty"><p>No events have been added yet.</p><p>Each event needs an official source link before it is shown.</p></div>'}"""
+    return layout(cfg, f"Calendar | {cfg['site_name']}", body, 1, "Calendar", '<script src="../assets/calendar.js" defer></script>')
+
+
+def load_editions(root):
+    out = {"daily": [], "weekly": [], "monthly": []}
+    for kind in out:
+        for f in sorted((Path(root) / "editions/published" / kind).glob("*.json"), reverse=True):
+            try:
+                e = json.loads(f.read_text("utf-8"))
+            except ValueError:
+                continue
+            if parse_day(e.get("date")) and e.get("reviewed_by") and e.get("reviewed_on"):
+                e["kind"] = kind
+                out[kind].append(e)
+    return out
+
+
+SECTIONS = {"daily": ("brief", "Daily Brief", "Essential stories", "Coming up"),
+            "weekly": ("weekly", "Weekly Review", "Major developments", "Connections across the week"),
+            "monthly": ("monthly", "Monthly Outlook", "Themes of the month", "Watchlist for next month")}
+LEDE = {"daily": "Ten to fifteen selected developments from the last day, each with context and what is coming next.",
+        "weekly": "The week's major themes and how they connected, rather than a list of headlines.",
+        "monthly": "A look back at the previous month plus the scheduled events to watch in the next."}
+
+
+def edition_index(cfg, kind, editions):
+    slug, name, _, _ = SECTIONS[kind]
+    if editions:
+        lst = "".join(f'<li><a href="{e["date"]}/">{esc(e.get("title") or name)}</a> <span class="meta">{esc(e["date"])}</span></li>' for e in editions)
+        inner = f'<ul class="plain">{lst}</ul>'
+    else:
+        inner = f'<div class="empty"><p>The first {esc(name)} has not been published yet.</p></div>'
+    body = f'<h1>{esc(name)}</h1><p class="lede">{LEDE[kind]}</p>{inner}'
+    return layout(cfg, f"{name} | {cfg['site_name']}", body, 1, name)
+
+
+def src_links(srcs):
+    return ", ".join(f'<a href="{esc(u["url"])}" rel="noopener noreferrer" target="_blank">{esc(u.get("publisher", "Source"))}</a>' for u in srcs or [] if str(u.get("url", "")).startswith("http"))
+
+
+def edition_page(cfg, e):
+    slug, name, h1, h2 = SECTIONS[e["kind"]]
+    stories = "".join(
+        f'<article class="ed-story"><h3>{esc(s["headline"])}</h3><p>{esc(s.get("context", ""))}</p>'
+        + (f'<p class="why-line"><strong>Why it matters.</strong> {esc(s["why"])}</p>' if s.get("why") else "")
+        + f'<p class="also">Sources: {src_links(s.get("sources")) or "none listed"}</p></article>' for s in e.get("stories", []))
+    watch = "".join(f'<li>{esc(w.get("date", "TBC"))}: {esc(w["text"])}'
+                    + (f' <a href="{esc(w["source_url"])}" rel="noopener noreferrer" target="_blank">Source</a>' if w.get("source_url") else "") + "</li>"
+                    for w in e.get("watchlist", []))
+    themes = "".join(f"<li><strong>{esc(t['title'])}</strong> {esc(t.get('note', ''))}</li>" for t in e.get("themes", []))
+    conn = f'<p>{esc(e["connections"])}</p>' if e.get("connections") else ""
+    if e["kind"] == "daily":
+        second = f'<h2>{h2}</h2><ul class="plain">{watch}</ul>' if watch else ""
+        first_extra = ""
+    elif e["kind"] == "weekly":
+        second = f"<h2>{h2}</h2>{conn}" if conn else ""
+        first_extra = ""
+    else:
+        first_extra = f'<h2>{h1}</h2><ul class="plain">{themes}</ul>' if themes else ""
+        second = f'<h2>{h2}</h2><ul class="plain">{watch}</ul>' if watch else ""
+    lead_h = "" if e["kind"] == "monthly" else f"<h2>{h1}</h2>"
+    body = (f'<h1>{esc(e.get("title") or name)}</h1><p class="meta"><span>{esc(e["date"])}</span>'
+            f'<span>Covers {esc(e.get("period_start", e["date"]))} to {esc(e.get("period_end", e["date"]))} UTC</span>'
+            f'<span>Reviewed by {esc(e["reviewed_by"])} on {esc(e["reviewed_on"])}</span></p>'
+            f'{f"<p class=lede>{esc(e["intro"])}</p>" if e.get("intro") else ""}{first_extra}{lead_h}{stories}{second}'
+            f'<p class="small"><a href="../">All {esc(name)} editions</a></p>')
+    return layout(cfg, f'{e.get("title") or name} | {cfg["site_name"]}', body, 2, name)
 
 
 def archive_page(cfg, items, depth=1):
@@ -266,15 +437,31 @@ def run(root):
 
     enabled, last, stale = source_health(registry, status, cfg, now)
     status_html = status_block(enabled, last, stale, cfg)
+    last_s = last.strftime("%Y-%m-%dT%H:%M:%SZ") if last else None
+    CTX["refresh"] = (f'<span class="rf{" late" if stale else ""}">News last refreshed <time class="full" datetime="{last_s}">{fmt_utc(last_s)}</time>'
+                      + (" (updates delayed)" if stale else "") + "</span>") if last else '<span class="rf late">No successful news refresh yet</span>'
+    nl = cfg.get("newsletter", {})
+    if nl.get("enabled") and str(nl.get("signup_url", "")).startswith("https://"):
+        CTX["subscribe"] = (f'<form class="sub" method="post" action="{esc(nl["signup_url"])}"><label class="sr">Email address</label>'
+                            '<input type="email" name="email" required placeholder="Email address"><button class="btn" type="submit">Subscribe</button></form>')
+    else:
+        CTX["subscribe"] = '<div class="sub off"><button class="btn" type="button" disabled>Subscribe</button><span class="small">Signup opens when the newsletter launches.</span></div>'
+
+    events = clean_events(load_json(root / "events.json", {"events": []}).get("events", []))
+    today = now.date()
+    rows = build_rows(items, editorial, registry)
+    editions = load_editions(root)
 
     pages = {
-        "index.html": home(cfg, items, editorial, status_html),
-        "brief/index.html": edition_page(cfg, "Daily Brief", "brief", 1, "Ten to fifteen selected developments from the last day, each with what happened, why it matters and what to watch next.", "Covers one UTC calendar day."),
-        "weekly/index.html": edition_page(cfg, "Weekly Review", "weekly", 1, "The week's major themes and how they connected, rather than a list of headlines.", "Covers Monday 00:00 to Sunday 23:59 UTC."),
-        "monthly/index.html": edition_page(cfg, "Monthly Outlook", "monthly", 1, "A look back at the previous month plus the scheduled events to watch in the next.", "Covers one UTC calendar month."),
+        "index.html": home(cfg, rows, editorial, status_html, events, today),
+        "calendar/index.html": calendar_page(cfg, events, today),
         "archive/index.html": archive_page(cfg, items),
         "about/index.html": about_page(cfg, registry, status),
     }
+    for kind, (slug, *_r) in SECTIONS.items():
+        pages[f"{slug}/index.html"] = edition_index(cfg, kind, editions[kind])
+        for e in editions[kind]:
+            pages[f"{slug}/{e['date']}/index.html"] = edition_page(cfg, e)
     for rel, content in pages.items():
         dest = out / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -282,7 +469,7 @@ def run(root):
 
     hidden = set(editorial.get("hidden", []))
     archive = sorted(
-        ({"i": v["id"], "t": v["title"], "u": v["url"], "p": v["publisher"], "d": v.get("published"),
+        ({"i": v["id"], "t": v["title"], "u": v["url"], "p": v["publisher"], "d": v.get("published"), "x": v.get("updated"),
           "c": v["category"], "r": v["region"]} for v in items.values() if v["id"] not in hidden),
         key=lambda r: r["d"] or "", reverse=True)
     save_json(out / "data/archive.json", archive)

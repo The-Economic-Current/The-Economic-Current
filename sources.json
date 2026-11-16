@@ -7,13 +7,14 @@
       "feed_url": "https://www.federalreserve.gov/feeds/press_all.xml",
       "url_confidence": "likely",
       "coverage": "Monetary policy, bank supervision, enforcement",
-      "default_category": "Central Banks & Interest Rates",
-      "region": "North America",
+      "default_category": "Economy",
+      "region": "Americas",
       "terms_url": "https://www.federalreserve.gov/disclaimer.htm",
       "reuse": "unreviewed",
       "reuse_notes": "Sibling feed press_bcreg.xml was seen live. Confirm press_all.xml and read the disclaimer page.",
       "enabled": false,
-      "terms_reviewed": null
+      "terms_reviewed": null,
+      "kind": "official"
     },
     {
       "id": "ecb-press",
@@ -21,13 +22,14 @@
       "feed_url": "https://www.ecb.europa.eu/rss/press.xml",
       "url_confidence": "likely",
       "coverage": "Press releases, speeches, interviews",
-      "default_category": "Central Banks & Interest Rates",
+      "default_category": "Economy",
       "region": "Europe",
       "terms_url": "https://www.ecb.europa.eu/services/disclaimer/html/index.en.html",
       "reuse": "unreviewed",
       "reuse_notes": "Check reuse and attribution conditions on the disclaimer page.",
       "enabled": false,
-      "terms_reviewed": null
+      "terms_reviewed": null,
+      "kind": "official"
     },
     {
       "id": "boe-news",
@@ -35,13 +37,14 @@
       "feed_url": "https://www.bankofengland.co.uk/rss/news",
       "url_confidence": "likely",
       "coverage": "News, monetary policy, prudential regulation",
-      "default_category": "Central Banks & Interest Rates",
+      "default_category": "Economy",
       "region": "Europe",
       "terms_url": "https://www.bankofengland.co.uk/terms-of-use",
       "reuse": "unreviewed",
       "reuse_notes": "Read the terms of use before enabling.",
       "enabled": false,
-      "terms_reviewed": null
+      "terms_reviewed": null,
+      "kind": "official"
     },
     {
       "id": "rbi-press",
@@ -49,13 +52,14 @@
       "feed_url": "https://www.rbi.org.in/pressreleases_rss.xml",
       "url_confidence": "likely",
       "coverage": "Press releases, policy announcements",
-      "default_category": "Central Banks & Interest Rates",
-      "region": "Asia-Pacific",
+      "default_category": "Economy",
+      "region": "Asia Pacific",
       "terms_url": "https://www.rbi.org.in/",
       "reuse": "unreviewed",
       "reuse_notes": "Locate and read the website's terms of use.",
       "enabled": false,
-      "terms_reviewed": null
+      "terms_reviewed": null,
+      "kind": "official"
     },
     {
       "id": "bls-latest",
@@ -63,13 +67,14 @@
       "feed_url": "https://www.bls.gov/feed/bls_latest.rss",
       "url_confidence": "likely",
       "coverage": "Jobs, inflation, productivity releases",
-      "default_category": "Global Economy",
-      "region": "North America",
+      "default_category": "Economy",
+      "region": "Americas",
       "terms_url": "https://www.bls.gov/opub/copyright-information.htm",
       "reuse": "unreviewed",
       "reuse_notes": "US federal statistics site; confirm the copyright page.",
       "enabled": false,
-      "terms_reviewed": null
+      "terms_reviewed": null,
+      "kind": "official"
     },
     {
       "id": "sec-press",
@@ -77,13 +82,14 @@
       "feed_url": "https://www.sec.gov/news/pressreleases.rss",
       "url_confidence": "likely",
       "coverage": "Enforcement, rulemaking, market regulation",
-      "default_category": "Exchanges, Trading & Regulation",
-      "region": "North America",
+      "default_category": "Trading & Exchanges",
+      "region": "Americas",
       "terms_url": "https://www.sec.gov/about/privacy-information",
       "reuse": "unreviewed",
       "reuse_notes": "SEC asks automated clients to send a descriptive User-Agent with contact details; set ECC_CONTACT.",
       "enabled": false,
-      "terms_reviewed": null
+      "terms_reviewed": null,
+      "kind": "official"
     },
     {
       "id": "cftc-press",
@@ -91,13 +97,14 @@
       "feed_url": "https://www.cftc.gov/RSS/RSSGP/rssgp.xml",
       "url_confidence": "likely",
       "coverage": "Derivatives, commodities and digital-asset regulation",
-      "default_category": "Exchanges, Trading & Regulation",
-      "region": "North America",
+      "default_category": "Trading & Exchanges",
+      "region": "Americas",
       "terms_url": "https://www.cftc.gov/",
       "reuse": "unreviewed",
       "reuse_notes": "Locate and read the site's terms.",
       "enabled": false,
-      "terms_reviewed": null
+      "terms_reviewed": null,
+      "kind": "official"
     },
     {
       "id": "imf-news",
@@ -105,13 +112,14 @@
       "feed_url": "https://www.imf.org/en/News/rss",
       "url_confidence": "find",
       "coverage": "Global outlook, country reports, policy statements",
-      "default_category": "Global Economy",
+      "default_category": "Economy",
       "region": "Global",
       "terms_url": "https://www.imf.org/en/About/Copyright-and-Terms",
       "reuse": "unreviewed",
       "reuse_notes": "Find the exact feed on the IMF RSS page; read the copyright and terms page.",
       "enabled": false,
-      "terms_reviewed": null
+      "terms_reviewed": null,
+      "kind": "official"
     },
     {
       "id": "bis-press",
@@ -119,13 +127,14 @@
       "feed_url": "https://www.bis.org/doclist/all_pressrels.rss",
       "url_confidence": "find",
       "coverage": "Central bank cooperation, financial stability",
-      "default_category": "Central Banks & Interest Rates",
+      "default_category": "Economy",
       "region": "Global",
       "terms_url": "https://www.bis.org/terms_conditions.htm",
       "reuse": "unreviewed",
       "reuse_notes": "Find the exact feed on the BIS RSS page; read terms and conditions.",
       "enabled": false,
-      "terms_reviewed": null
+      "terms_reviewed": null,
+      "kind": "official"
     },
     {
       "id": "worldbank-news",
@@ -133,13 +142,14 @@
       "feed_url": "https://www.worldbank.org/en/news/all",
       "url_confidence": "find",
       "coverage": "Development finance, global growth, trade",
-      "default_category": "Global Economy",
+      "default_category": "Economy",
       "region": "Global",
       "terms_url": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
       "reuse": "unreviewed",
       "reuse_notes": "Find the exact feed on the World Bank RSS page; confirm which terms cover news text.",
       "enabled": false,
-      "terms_reviewed": null
+      "terms_reviewed": null,
+      "kind": "official"
     },
     {
       "id": "bbc-business",
@@ -147,11 +157,87 @@
       "feed_url": "https://feeds.bbci.co.uk/news/business/rss.xml",
       "url_confidence": "likely",
       "coverage": "Business and economy news",
-      "default_category": "Global Economy",
+      "default_category": "Economy",
       "region": "Europe",
       "terms_url": "https://www.bbc.co.uk/news/10628494",
       "reuse": "blocked",
       "reuse_notes": "BBC feeds are offered for personal, non-commercial use. Do not enable on a commercial site without a licence.",
+      "enabled": false,
+      "terms_reviewed": null,
+      "kind": "press"
+    },
+    {
+      "id": "rba-media",
+      "publisher": "Reserve Bank of Australia",
+      "feed_url": "https://www.rba.gov.au/rss/rss-cb-media-releases.xml",
+      "url_confidence": "likely",
+      "coverage": "Monetary policy decisions and media releases",
+      "default_category": "Economy",
+      "region": "Asia Pacific",
+      "terms_url": "https://www.rba.gov.au/copyright/",
+      "reuse": "unreviewed",
+      "reuse_notes": "Confirm the feed URL on the RBA RSS page and read the copyright page.",
+      "kind": "official",
+      "enabled": false,
+      "terms_reviewed": null
+    },
+    {
+      "id": "boj-whatsnew",
+      "publisher": "Bank of Japan",
+      "feed_url": "https://www.boj.or.jp/en/rss/whatsnew.xml",
+      "url_confidence": "likely",
+      "coverage": "Policy statements and publications",
+      "default_category": "Economy",
+      "region": "Asia Pacific",
+      "terms_url": "https://www.boj.or.jp/en/about/terms/index.htm",
+      "reuse": "unreviewed",
+      "reuse_notes": "Confirm the feed URL on the BoJ RSS page and read the terms.",
+      "kind": "official",
+      "enabled": false,
+      "terms_reviewed": null
+    },
+    {
+      "id": "hkex-news",
+      "publisher": "Hong Kong Exchanges and Clearing",
+      "feed_url": "https://www.hkex.com.hk/News/News-Release",
+      "url_confidence": "find",
+      "coverage": "Exchange news releases, listings, market structure",
+      "default_category": "Trading & Exchanges",
+      "region": "Asia Pacific",
+      "terms_url": "https://www.hkex.com.hk/Global/Exchange/Disclaimer",
+      "reuse": "unreviewed",
+      "reuse_notes": "Find the exact RSS feed (if any) on HKEX's site; read the disclaimer.",
+      "kind": "official",
+      "enabled": false,
+      "terms_reviewed": null
+    },
+    {
+      "id": "esma-news",
+      "publisher": "European Securities and Markets Authority",
+      "feed_url": "https://www.esma.europa.eu/rss",
+      "url_confidence": "find",
+      "coverage": "EU securities regulation, market structure",
+      "default_category": "Trading & Exchanges",
+      "region": "Europe",
+      "terms_url": "https://www.esma.europa.eu/legal-notice",
+      "reuse": "unreviewed",
+      "reuse_notes": "Find the exact feed on the ESMA RSS page; read the legal notice.",
+      "kind": "official",
+      "enabled": false,
+      "terms_reviewed": null
+    },
+    {
+      "id": "sebi-press",
+      "publisher": "Securities and Exchange Board of India",
+      "feed_url": "https://www.sebi.gov.in/sebirss.xml",
+      "url_confidence": "find",
+      "coverage": "Indian securities regulation, IPO rules",
+      "default_category": "Trading & Exchanges",
+      "region": "Asia Pacific",
+      "terms_url": "https://www.sebi.gov.in/",
+      "reuse": "unreviewed",
+      "reuse_notes": "Locate the exact feed and the site's terms.",
+      "kind": "official",
       "enabled": false,
       "terms_reviewed": null
     }

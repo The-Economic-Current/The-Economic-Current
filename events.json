@@ -1,0 +1,4 @@
+{
+  "_readme": "Calendar entries. Each needs title, type (ipo, earnings, inflation, employment, gdp, central_bank, election, policy, other), date (YYYY-MM-DD or null for TBC), status (proposed, expected, confirmed, postponed, withdrawn, completed), source_url (https, official where possible), source_name, verified (YYYY-MM-DD). IPOs also take company-level fields country, exchange, ticker, currency, offer_range, final_price and milestones {filing, subscription_open, subscription_close, pricing, listing}, each {date, status}. Entries without a source_url are not shown.",
+  "events": []
+}

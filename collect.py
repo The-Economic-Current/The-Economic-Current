@@ -21,34 +21,35 @@ from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 CATEGORIES = [
-    "Global Economy",
-    "Stocks & Corporate Earnings",
-    "Central Banks & Interest Rates",
-    "Forex & Bonds",
-    "Commodities & Energy",
-    "Trade & Economic Policy",
-    "Exchanges, Trading & Regulation",
-    "Digital Assets",
+    "Economy",
+    "Politics & Policy",
+    "Markets",
+    "Trading & Exchanges",
+    "Finance & Business",
+    "IPOs & Listings",
+    "Fintech",
+    "Technology",
+    "Blockchain & Digital Assets",
 ]
-REGIONS = ["Global", "North America", "Europe", "Asia-Pacific", "Middle East & Africa", "Latin America"]
+REGIONS = ["Global", "Asia Pacific", "Europe", "Americas", "Middle East & Africa"]
 
-# Automated keyword tags. Order is the tie-break priority. These are labelled as automated on the site.
+# Automated keyword tags. Highest keyword count wins; ties go to the earlier rule. Shown on the site as automated.
 CAT_RULES = [
-    ("Digital Assets", ["bitcoin", "crypto", "stablecoin", "ethereum", "digital asset", "blockchain", "token", "cbdc"]),
-    ("Central Banks & Interest Rates", ["central bank", "interest rate", "rate cut", "rate hike", "monetary policy", "fomc", "federal reserve", "ecb", "bank of england", "bank of japan", "repo rate", "policy rate", "discount rate"]),
-    ("Commodities & Energy", ["oil", "crude", "opec", "natural gas", "lng", "gold", "copper", "commodity", "commodities", "wheat", "brent", "energy prices"]),
-    ("Forex & Bonds", ["currency", "forex", "exchange rate", "dollar", "euro", "yen", "yuan", "sterling", "bond", "bonds", "yield", "yields", "sovereign debt"]),
-    ("Stocks & Corporate Earnings", ["earnings", "shares", "stock", "stocks", "equities", "profit", "quarterly results", "ipo", "dividend", "s&p 500", "nasdaq"]),
-    ("Exchanges, Trading & Regulation", ["regulator", "regulation", "exchange", "trading", "listing", "clearing", "enforcement", "compliance", "market structure", "cftc", "esma", "fca", "sec"]),
-    ("Trade & Economic Policy", ["tariff", "tariffs", "trade deal", "trade war", "sanctions", "export", "exports", "import", "imports", "wto", "subsidy", "budget", "fiscal", "tax"]),
-    ("Global Economy", ["gdp", "inflation", "unemployment", "jobs", "economy", "recession", "growth", "cpi", "pmi", "imf", "world bank", "productivity", "labour", "labor"]),
+    ("Blockchain & Digital Assets", ["bitcoin", "crypto", "stablecoin", "ethereum", "digital asset", "digital assets", "blockchain", "token", "tokenisation", "tokenization", "defi", "cbdc", "custody"]),
+    ("IPOs & Listings", ["ipo", "initial public offering", "prospectus", "listing date", "direct listing", "offer price", "price range", "bookbuilding", "subscription period", "secondary offering", "delisting"]),
+    ("Fintech", ["fintech", "payments", "payment", "digital bank", "neobank", "remittance", "remittances", "open banking", "instant payment"]),
+    ("Technology", ["artificial intelligence", "ai", "semiconductor", "semiconductors", "chip", "chips", "cybersecurity", "cyber", "cloud", "data centre", "data center", "startup", "software"]),
+    ("Trading & Exchanges", ["exchange", "exchanges", "futures", "options", "clearing", "clearinghouse", "settlement", "market structure", "liquidity", "trading halt", "circuit breaker", "broker", "brokers", "trading rules", "outage"]),
+    ("Markets", ["stocks", "stock", "equities", "index", "indices", "etf", "etfs", "bond", "bonds", "yield", "yields", "currency", "forex", "dollar", "euro", "yen", "yuan", "sterling", "oil", "crude", "brent", "gold", "silver", "copper", "lng", "commodity", "commodities", "natural gas", "nasdaq", "s&p 500", "shares"]),
+    ("Finance & Business", ["banks", "banking", "lender", "lending", "loan", "loans", "insurance", "insurer", "asset manager", "earnings", "profit", "quarterly results", "private equity", "venture capital", "fundraising", "merger", "acquisition", "takeover", "buyout", "dividend"]),
+    ("Politics & Policy", ["election", "elections", "parliament", "government", "budget", "tariff", "tariffs", "sanctions", "geopolitical", "trade deal", "trade war", "regulator", "regulation", "minister", "fiscal", "tax", "subsidy", "export controls"]),
+    ("Economy", ["gdp", "inflation", "unemployment", "jobs", "employment", "economy", "recession", "growth", "cpi", "pmi", "central bank", "interest rate", "rate cut", "rate hike", "policy rate", "rates", "monetary policy", "imf", "world bank", "productivity", "labour", "labor", "trade balance"]),
 ]
 REGION_RULES = [
-    ("North America", ["u.s.", "united states", "american", "washington", "wall street", "federal reserve", "fomc", "canada", "canadian", "nasdaq", "nyse", "s&p 500"]),
+    ("Americas", ["u.s.", "united states", "american", "washington", "wall street", "federal reserve", "fomc", "canada", "canadian", "nasdaq", "nyse", "s&p 500", "brazil", "brazilian", "mexico", "mexican", "argentina", "chile", "colombia", "peru", "latin america"]),
     ("Europe", ["euro area", "eurozone", "european", "ecb", "germany", "german", "france", "french", "italy", "italian", "spain", "spanish", "britain", "u.k.", "uk", "bank of england", "london", "switzerland", "swiss"]),
-    ("Asia-Pacific", ["china", "chinese", "japan", "japanese", "india", "indian", "australia", "australian", "korea", "singapore", "hong kong", "asean", "taiwan", "indonesia", "pboc", "bank of japan", "rbi"]),
-    ("Middle East & Africa", ["saudi", "opec", "israel", "uae", "emirates", "nigeria", "south africa", "egypt", "africa", "african", "gulf", "iran", "turkey", "turkish"]),
-    ("Latin America", ["brazil", "brazilian", "mexico", "mexican", "argentina", "chile", "colombia", "peru", "latin america"]),
+    ("Asia Pacific", ["china", "chinese", "japan", "japanese", "india", "indian", "australia", "australian", "korea", "singapore", "hong kong", "asean", "taiwan", "indonesia", "philippines", "vietnam", "pboc", "bank of japan", "rbi", "new zealand"]),
+    ("Middle East & Africa", ["saudi", "opec", "israel", "uae", "emirates", "nigeria", "south africa", "egypt", "africa", "african", "gulf", "iran", "turkey", "turkish", "kenya", "qatar"]),
 ]
 
 MAX_BYTES = 3_000_000
@@ -145,7 +146,9 @@ def parse_feed(data):
         out.append({
             "title": strip_html(title),
             "link": link,
-            "published": parse_date(child_text(el, ("pubDate", "published", "updated", "date"))),
+            # published and updated are kept apart; an update time is never shown as the publication time
+            "published": parse_date(child_text(el, ("pubDate", "published", "date", "issued"))),
+            "updated": parse_date(child_text(el, ("updated", "modified"))),
             "raw_summary": child_text(el, ("description", "summary", "encoded", "content")),
         })
     return out
@@ -198,7 +201,7 @@ def classify(title, summary, src):
         n = _count(text, words)
         if n > score:
             best, score = cat, n
-    category = best or src.get("default_category") or "Global Economy"
+    category = best or src.get("default_category") or "Economy"
     best, score = None, 0
     for reg, words in REGION_RULES:
         n = _count(text, words)
@@ -285,6 +288,7 @@ def run(root):
                         "publisher": s["publisher"],
                         "source_id": s["id"],
                         "published": iso(e["published"]),
+                        "updated": iso(e["updated"]) if e.get("updated") and e["updated"] != e["published"] else None,
                         "category": category,
                         "region": region,
                         "summary": summary,

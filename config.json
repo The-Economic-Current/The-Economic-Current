@@ -5,5 +5,10 @@
   "stale_after_hours": 6,
   "max_summary_chars": 300,
   "homepage_items": 150,
-  "request_timeout_seconds": 20
+  "request_timeout_seconds": 20,
+  "newsletter": {
+    "enabled": false,
+    "signup_url": ""
+  },
+  "timezone_label": "UTC"
 }
