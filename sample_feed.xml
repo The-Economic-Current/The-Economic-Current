@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test fixture feed (not real news)</title>
+    <link>https://example.test/</link>
+    <description>Synthetic items used only by the automated tests.</description>
+    <item>
+      <title>Test central bank holds policy rate steady</title>
+      <link>https://example.test/a1?utm_source=feed</link>
+      <pubDate>Wed, 11 Nov 2026 09:30:00 GMT</pubDate>
+      <description><![CDATA[<p>Synthetic test text: the fictional central bank said its policy rate was unchanged and described its decision process at length for testing.</p>]]></description>
+    </item>
+    <item>
+      <title>Test regulator announces enforcement action</title>
+      <link>https://example.test/a2</link>
+      <pubDate>Wed, 11 Nov 2026 12:00:00 GMT</pubDate>
+      <description>Test regulator announces enforcement action</description>
+    </item>
+    <item>
+      <title>Item with no date in the feed</title>
+      <link>https://example.test/a3</link>
+      <description>Synthetic test text about a Brazil bond auction with enough words to count as an excerpt for the summary check.</description>
+    </item>
+  </channel>
+</rss>
